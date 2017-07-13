@@ -1,0 +1,288 @@
+<?php
+
+Class Thumbies extends WireData implements Module
+{
+    /* ============================================================================= */
+    /* Properties ================================================================== */
+    /* ============================================================================= */
+
+    /**
+     * the incoming file
+     * must be a Pagefile
+     */
+    public $file;
+
+    /**
+     * name of the field that thumbnails will be saved to
+     */
+    public $thumbnailField;
+    
+    /**
+     * page that contains the file that was passed to Thumbies
+     */
+    public $page;
+
+    /**
+     * when ProcessWire gived things a name, it sanitizes them.
+     * this is the name that ProcessWire would give a thumbnail if it was uploaded,
+     * and it allows Thumbies to find the thumbnail for the given file.
+     */
+    protected $sanitizedName;
+
+    /**
+     * this is a reference to where the file *could* be on the server,
+     * but it might not have been saved to the field yet.
+     * 
+     * this allows a fallback if $thumbnail is Null.
+     * perhaps the file has already been created and saved to the proper directory, but has not been added to the database yet.
+     * $itMightAlreadyBeHere facilitates that possibility.
+     */
+    protected $itMightAlreadyBeHere;
+
+    /**
+     * bool on whether or not the file is on the server
+     */
+    protected $exists;
+
+    /**
+     * location of a temporary directory that will be used by Thumbies
+     */
+    protected $tempDir;
+
+    /**
+     * set per loop, it's the final resting place of a created thumbnail
+     */
+    protected $fullSavePath;
+    
+    /**
+     * the extension of the incoming file
+     */
+    protected $ext;
+
+    /**
+     * the finished thumbnail
+     */
+    protected $output;
+
+
+
+    /* ============================================================================= */
+    /* Methods ===================================================================== */
+    /* ============================================================================= */
+
+    /**
+    * getModuleInfo() returns information about this module
+    */
+    public static function getModuleInfo() {
+        return array(
+            'title' => 'Thumbies',
+            'summary' => 'Pass a file without a thumbnail, and Thumbies will create one.',
+            'version' => '0.0.1',
+            'author' => 'Ethan Beyer',
+            'icon' => 'picture-o',
+            'autoload' => true,
+            'href' => 'https://github.com/ethanbeyer/Thumbies',
+        );
+    }
+
+    /**
+     * init() in this case is used simply to set fuel for this class.
+     *
+     * Making Thumbies accessible globally through $thumbies.
+     */
+    public function init()
+    {
+        $this->wire('thumbies', $this);
+    }
+
+    /**
+     * getThumbnail() acts as the main pivot point for the class.
+     * 
+     * It sets a number of defaults that will be used per cycle.
+     *
+     * @param       Pagefile            $file
+     * @param       String              $thumbnailField     name of the field that the thumbnails will be saved to
+     * @return      Pageimage object
+     */
+    public function getThumbnail(Pagefile $file, $thumbnailField)
+    {
+        $thumbnail = '';
+
+        $this->file = $file;
+        $this->ext = $this->file->ext();
+        $this->thumbnailField = $thumbnailField;
+        $this->page = $this->file->page;
+
+        // 1. remove the period: '.pdf' becomes '_pdf'
+        // 2. create a temporary directory for the thumbnail to be saved to before it is added to ProcessWire
+        // 3. sanitize the name to match what PW will do to it
+        // 4. create a savePath by merging the tempDir and the sanitizedName, the final resting place of the temporary thumbnail
+        $removeTheDot = str_replace('.', '_', $file->basename());
+        $this->tempDir = $this->wire('files')->tempDir('Thumbies')->get();
+        $this->sanitizedName = $this->wire('sanitizer')->filename('thumbies_' . $removeTheDot . '.jpg', true); 
+        $this->fullSavePath = $this->tempDir . $this->sanitizedName;
+
+        // first check to see if the file exists in the database
+        $thumbnail = $this->page->$thumbnailField->getFile($this->sanitizedName);
+        
+        // then see if it exists in the file structure
+        $this->itMightAlreadyBeHere = $this->wire('config')->paths->files . $this->page->id . '/' . $this->sanitizedName;
+        $this->exists = file_exists($this->itMightAlreadyBeHere);
+
+        // if it does not, create the file
+        if($thumbnail instanceof Pageimage && $this->exists == true) {
+            $this->output = $thumbnail;
+        }
+        elseif($thumbnail instanceof Pageimage && $this->exists == false) {
+            $this->deleteFromPageAndSave($this->sanitizedName);
+        }
+        elseif(!$thumbnail && $this->exists == true) {
+            $this->addToPageAndSave($this->itMightAlreadyBeHere);
+        }
+        else {
+            $this->contingencies();
+        }
+
+        return $this->output;
+    }
+
+    /**
+     * contingencies() is essentially a switch, and it's here mostly for code readability.
+     * This process has so many nested IF/ELSE blocks that it seemed necessary to compartmentalize.
+     */
+    private function contingencies()
+    {
+        if(in_array($this->file->ext(), ['docx', 'xlsx', 'pptx'])) {
+            $this->extractMicrosoftThumbnail();
+        }
+        else {
+            $this->makeThumbnail();
+        }
+    }
+
+    /**
+     * extractMicrosoftThumbnail() is kind of fun.
+     * Since .docx, .pptx and .xlsx are just ZIPs and already have a thumbnail created by their respective programs,
+     * this function unzips the file and saves the thumbnail to the field.
+     */
+    private function extractMicrosoftThumbnail()
+    {
+        $file = $this->file;
+        $tempLocation = $this->tempDir;
+
+        // unzip
+        $this->wire('files')->unzip($file->filename(), $tempLocation);
+        
+        if(file_exists($tempLocation . '/docProps/thumbnail.jpeg')) {
+            // rename
+            $this->wire('files')->copy(
+                $tempLocation . '/docProps/thumbnail.jpeg',
+                $tempLocation . $this->sanitizedName
+            );
+            
+            // add to the field
+            $this->addToPageAndSave($tempLocation . $this->sanitizedName);
+        }
+        else {
+            $this->standardThumbnail();
+        }
+    }
+
+    /**
+     * makeThumbnail() uses Imagemagick to generate thumbnails for lots of filetypes.
+     * PDFs and Movie files will be the norm here, though.
+     */
+    private function makeThumbnail()
+    {   
+        // if it's not one of the following, it's probably a PDF. if it's a PDF, use the first page.
+        // otherwise it's probably a video, so grab something just after the 2s mark.
+        // this is probably a bad-ish idea.
+        // but that's what the standardThumbnail() is for...
+        $where = (!in_array($this->file->ext(), ['mov', 'avi', 'mp4', 'm4v', 'mpg', 'mpeg'])) ? "[0]" : "[60]";
+        $frame = realpath($this->file->filename()) . $where;
+        $save = false;
+
+        // try to create the thumbnail
+        try {
+            $imagick = new Imagick();
+            $imagick->readImage($frame);
+            $imagick->setImageFormat('jpg');
+            $imagick->scaleImage(400,0);
+            $imagick = $imagick->flattenImages();
+            $save = $imagick->writeImage($this->fullSavePath);
+        }
+        catch(Exception $e) {
+            $this->wire('log')->error($e->getMessage());
+        }
+        
+        // if creation and saving to tempDir were successful, save it to the field.
+        if($save) {
+            $this->addToPageAndSave($this->fullSavePath);
+        }
+        else {
+            $this->standardThumbnail();
+        }
+    }
+
+    /**
+     * addToPageAndSave()
+     *
+     * @param   $pathToFile    server path to the file that will be added to the image field.
+     */
+    private function addToPageAndSave($pathToFile)
+    {
+        $field = $this->thumbnailField;
+        $page = $this->page;
+
+        $page->setOutputFormatting(false);
+        $page->$field->add($pathToFile);
+        $page->save($field);
+
+        // start the process over again to get the thumbnail and return it.
+        $this->getThumbnail($this->file, $this->thumbnailField);
+    }
+
+    /**
+     * deleteFromPageAndSave()
+     *
+     * @param   $pathToFile    server path to the file that will be added to the image field.
+     */
+    private function deleteFromPageAndSave($pathToFile)
+    {
+        $field = $this->thumbnailField;
+        $page = $this->page;
+
+        $page->setOutputFormatting(false);
+        $page->$field->delete($pathToFile);
+        $page->save($field);
+
+        // start the process over again to get the thumbnail and return it.
+        $this->getThumbnail($this->file, $this->thumbnailField);
+    }
+
+    /**
+     * standardThumbnail() is a hacked-together P.O.S. that allows for the very real possibility that a document might not get a thumbnail all to itself.
+     */
+    private function standardThumbnail()
+    {
+        $standardThumbnail = new stdClass();
+        $standardThumbnail->url = $this->wire('config')->urls->get('Thumbies') . 'docicon.png';
+        $this->output = $standardThumbnail;
+    }
+
+    /**
+     * wipeThumbnails() is a utility function that will eventually get baked into the module in a better way.
+     *
+     * For now, just put it in a template one time and call $thumbies::wipeThumbnails();
+     */
+    public static function wipeThumbnails()
+    {
+        // $pages = wire('pages')->find('template=documents');
+        // foreach($pages as $doc) {
+        //     foreach($doc->documents_Repeater as $single) {
+        //         $single->documents_File_thumbnail
+        //     }
+        // }
+
+    }
+}
