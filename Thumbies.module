@@ -251,10 +251,12 @@ Class Thumbies extends WireData implements Module
     {
         $field = $this->thumbnailField;
         $page = $this->page;
+        $of    = $page->of();
 
         $page->setOutputFormatting(false);
         $page->$field->add($pathToFile);
         $page->save($field);
+        $page->setOutputFormatting($of);
 
         // start the process over again to get the thumbnail and return it.
         $this->getThumbnail($this->file, $this->thumbnailField);
@@ -269,10 +271,12 @@ Class Thumbies extends WireData implements Module
     {
         $field = $this->thumbnailField;
         $page = $this->page;
+        $of    = $page->of();
 
         $page->setOutputFormatting(false);
         $page->$field->delete($pathToFile);
         $page->save($field);
+        $page->setOutputFormatting($of);
 
         // start the process over again to get the thumbnail and return it.
         $this->getThumbnail($this->file, $this->thumbnailField);
