@@ -126,7 +126,11 @@ Class Thumbies extends WireData implements Module
         $thumbnail = $this->page->$thumbnailField->getFile($this->sanitizedName);
         
         // then see if it exists in the file structure
-        $this->itMightAlreadyBeHere = $this->wire('config')->paths->files . $this->page->id . '/' . $this->sanitizedName;
+        $pathmod = '';
+        if ($this->wire('config')->pagefileSecure) {
+            $pathmod = $this->wire('config')->pagefileSecurePathPrefix;
+        }
+        $this->itMightAlreadyBeHere = $this->wire('config')->paths->files . $pathmod . $this->page->id . '/' . $this->sanitizedName;
         $this->exists = file_exists($this->itMightAlreadyBeHere);
 
         // if it does not, create the file
