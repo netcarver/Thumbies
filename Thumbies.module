@@ -128,6 +128,7 @@ Class Thumbies extends WireData implements Module
         $this->sanitizedName = $this->wire('sanitizer')->filename('thumbies_' . $removeTheDot . '.jpg', true); 
         $this->fullSavePath = $this->tempDir . $this->sanitizedName;
 
+        try {
         // first check to see if the file exists in the database
         $thumbnail = $this->page->$thumbnailField->getFile($this->sanitizedName);
         
@@ -151,6 +152,10 @@ Class Thumbies extends WireData implements Module
         }
         else {
             $this->contingencies();
+        }
+        } catch (Exception $e) {
+            $this->wire('log')->error($e->getMessage());
+            $this->standardThumbnail();
         }
 
         return $this->output;
