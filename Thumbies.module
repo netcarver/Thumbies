@@ -202,13 +202,20 @@ Class Thumbies extends WireData implements Module
         // otherwise it's probably a video, so grab something just after the 2s mark.
         // this is probably a bad-ish idea.
         // but that's what the standardThumbnail() is for...
-        $where = (!in_array($this->file->ext(), ['mov', 'avi', 'mp4', 'm4v', 'mpg', 'mpeg'])) ? "[0]" : "[60]";
+        $ext   = $this->file->ext();
+        $where = (!in_array($ext, ['mov', 'avi', 'mp4', 'm4v', 'mpg', 'mpeg'])) ? "[0]" : "[60]";
         $frame = realpath($this->file->filename()) . $where;
         $save = false;
 
         // try to create the thumbnail
         try {
             $imagick = new Imagick();
+
+            if ('pdf' == $ext) {
+                $imagick->setOption("pdf:use-cropbox", "true");
+            }
+            $imagick->setColorSpace(Imagick::COLORSPACE_RGB);
+            $imagick->setResolution(288, 288);
             $imagick->readImage($frame);
             $imagick->setImageFormat('jpg');
             $imagick->scaleImage(400,0);
