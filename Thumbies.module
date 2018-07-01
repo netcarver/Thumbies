@@ -102,7 +102,7 @@ Class Thumbies extends WireData implements Module
 
     /**
      * getThumbnail() acts as the main pivot point for the class.
-     * 
+     *
      * It sets a number of defaults that will be used per cycle.
      *
      * @param       Pagefile            $file
@@ -125,34 +125,34 @@ Class Thumbies extends WireData implements Module
         // 4. create a savePath by merging the tempDir and the sanitizedName, the final resting place of the temporary thumbnail
         $removeTheDot = str_replace('.', '_', $file->basename());
         $this->tempDir = $this->wire('files')->tempDir('Thumbies')->get();
-        $this->sanitizedName = $this->wire('sanitizer')->filename('thumbies_' . $removeTheDot . '.jpg', true); 
+        $this->sanitizedName = $this->wire('sanitizer')->filename('thumbies_' . $removeTheDot . '.jpg', true);
         $this->fullSavePath = $this->tempDir . $this->sanitizedName;
 
         try {
-        // first check to see if the file exists in the database
-        $thumbnail = $this->page->$thumbnailField->getFile($this->sanitizedName);
-        
-        // then see if it exists in the file structure
-        $pathmod = '';
-        if ($this->wire('config')->pagefileSecure) {
-            $pathmod = $this->wire('config')->pagefileSecurePathPrefix;
-        }
-        $this->itMightAlreadyBeHere = $this->wire('config')->paths->files . $pathmod . $this->page->id . '/' . $this->sanitizedName;
-        $this->exists = file_exists($this->itMightAlreadyBeHere);
+            // first check to see if the file exists in the database
+            $thumbnail = $this->page->$thumbnailField->getFile($this->sanitizedName);
 
-        // if it does not, create the file
-        if($thumbnail instanceof Pageimage && $this->exists == true) {
-            $this->output = $thumbnail;
-        }
-        elseif($thumbnail instanceof Pageimage && $this->exists == false) {
-            $this->deleteFromPageAndSave($this->sanitizedName);
-        }
-        elseif(!$thumbnail && $this->exists == true) {
-            $this->addToPageAndSave($this->itMightAlreadyBeHere);
-        }
-        else {
-            $this->contingencies();
-        }
+            // then see if it exists in the file structure
+            $pathmod = '';
+            if ($this->wire('config')->pagefileSecure) {
+                $pathmod = $this->wire('config')->pagefileSecurePathPrefix;
+            }
+            $this->itMightAlreadyBeHere = $this->wire('config')->paths->files . $pathmod . $this->page->id . '/' . $this->sanitizedName;
+            $this->exists = file_exists($this->itMightAlreadyBeHere);
+
+            // if it does not, create the file
+            if($thumbnail instanceof Pageimage && $this->exists == true) {
+                $this->output = $thumbnail;
+            }
+            elseif($thumbnail instanceof Pageimage && $this->exists == false) {
+                $this->deleteFromPageAndSave($this->sanitizedName);
+            }
+            elseif(!$thumbnail && $this->exists == true) {
+                $this->addToPageAndSave($this->itMightAlreadyBeHere);
+            }
+            else {
+                $this->contingencies();
+            }
         } catch (Exception $e) {
             $this->wire('log')->error($e->getMessage());
             $this->standardThumbnail();
