@@ -16,7 +16,7 @@ Class Thumbies extends WireData implements Module
      * name of the field that thumbnails will be saved to
      */
     public $thumbnailField;
-    
+
     /**
      * page that contains the file that was passed to Thumbies
      */
@@ -32,7 +32,7 @@ Class Thumbies extends WireData implements Module
     /**
      * this is a reference to where the file *could* be on the server,
      * but it might not have been saved to the field yet.
-     * 
+     *
      * this allows a fallback if $thumbnail is Null.
      * perhaps the file has already been created and saved to the proper directory, but has not been added to the database yet.
      * $itMightAlreadyBeHere facilitates that possibility.
@@ -53,7 +53,7 @@ Class Thumbies extends WireData implements Module
      * set per loop, it's the final resting place of a created thumbnail
      */
     protected $fullSavePath;
-    
+
     /**
      * the extension of the incoming file
      */
@@ -80,13 +80,13 @@ Class Thumbies extends WireData implements Module
     */
     public static function getModuleInfo() {
         return array(
-            'title' => 'Thumbies',
-            'summary' => 'Pass a file without a thumbnail, and Thumbies will create one.',
-            'version' => '0.0.1',
-            'author' => 'Ethan Beyer',
-            'icon' => 'picture-o',
-            'autoload' => true,
-            'href' => 'https://github.com/ethanbeyer/Thumbies',
+            'title'    => 'Thumbies',
+            'summary'  => 'Pass a file without a thumbnail, and Thumbies will create one.',
+            'version'  => '0.0.1',
+            'author'   => 'Ethan Beyer',
+            'icon'     => 'picture-o',
+            'autoload' => false,
+            'href'     => 'https://github.com/ethanbeyer/Thumbies',
         );
     }
 
@@ -193,7 +193,7 @@ Class Thumbies extends WireData implements Module
                 $tempLocation . '/docProps/thumbnail.jpeg',
                 $tempLocation . $this->sanitizedName
             );
-            
+
             // add to the field
             $this->addToPageAndSave($tempLocation . $this->sanitizedName);
         }
@@ -207,7 +207,7 @@ Class Thumbies extends WireData implements Module
      * PDFs and Movie files will be the norm here, though.
      */
     private function makeThumbnail()
-    {   
+    {
         // if it's not one of the following, it's probably a PDF. if it's a PDF, use the first page.
         // otherwise it's probably a video, so grab something just after the 2s mark.
         // this is probably a bad-ish idea.
@@ -215,7 +215,7 @@ Class Thumbies extends WireData implements Module
         $ext   = $this->file->ext();
         $where = (!in_array($ext, ['mov', 'avi', 'mp4', 'm4v', 'mpg', 'mpeg'])) ? "[0]" : "[60]";
         $frame = realpath($this->file->filename()) . $where;
-        $save = false;
+        $save  = false;
 
         // try to create the thumbnail
         try {
@@ -237,7 +237,7 @@ Class Thumbies extends WireData implements Module
         catch(Exception $e) {
             $this->wire('log')->error($e->getMessage());
         }
-        
+
         // if creation and saving to tempDir were successful, save it to the field.
         if($save) {
             $this->addToPageAndSave($this->fullSavePath);
@@ -255,7 +255,7 @@ Class Thumbies extends WireData implements Module
     private function addToPageAndSave($pathToFile)
     {
         $field = $this->thumbnailField;
-        $page = $this->page;
+        $page  = $this->page;
         $of    = $page->of();
 
         $page->setOutputFormatting(false);
@@ -275,7 +275,7 @@ Class Thumbies extends WireData implements Module
     private function deleteFromPageAndSave($pathToFile)
     {
         $field = $this->thumbnailField;
-        $page = $this->page;
+        $page  = $this->page;
         $of    = $page->of();
 
         $page->setOutputFormatting(false);
