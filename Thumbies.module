@@ -65,6 +65,11 @@ Class Thumbies extends WireData implements Module
     protected $output;
 
 
+    /**
+     * the width of the image that we'd like. Defaults to 400.
+     */
+    protected $width;
+
 
     /* ============================================================================= */
     /* Methods ===================================================================== */
@@ -104,10 +109,11 @@ Class Thumbies extends WireData implements Module
      * @param       String              $thumbnailField     name of the field that the thumbnails will be saved to
      * @return      Pageimage object
      */
-    public function getThumbnail(Pagefile $file, $thumbnailField)
+    public function getThumbnail(Pagefile $file, $thumbnailField, $width = 400)
     {
         $thumbnail = '';
 
+        $this->width = $width;
         $this->file = $file;
         $this->ext = $this->file->ext();
         $this->thumbnailField = $thumbnailField;
@@ -176,7 +182,6 @@ Class Thumbies extends WireData implements Module
 
         // unzip
         $this->wire('files')->unzip($file->filename(), $tempLocation);
-        
         if(file_exists($tempLocation . '/docProps/thumbnail.jpeg')) {
             // rename
             $this->wire('files')->copy(
@@ -218,7 +223,7 @@ Class Thumbies extends WireData implements Module
             $imagick->setResolution(288, 288);
             $imagick->readImage($frame);
             $imagick->setImageFormat('jpg');
-            $imagick->scaleImage(400,0);
+            $imagick->scaleImage($this->width, 0);
             $imagick->setImageBackgroundColor('white');
             $imagick->setImageAlphaChannel(11);
             $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
