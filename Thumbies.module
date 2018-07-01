@@ -212,7 +212,9 @@ Class Thumbies extends WireData implements Module
             $imagick->readImage($frame);
             $imagick->setImageFormat('jpg');
             $imagick->scaleImage(400,0);
-            $imagick = $imagick->flattenImages();
+            $imagick->setImageBackgroundColor('white');
+            $imagick->setImageAlphaChannel(11);
+            $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
             $save = $imagick->writeImage($this->fullSavePath);
         }
         catch(Exception $e) {
