@@ -85,7 +85,7 @@ Class Thumbies extends WireData implements Module
             'version'  => '0.0.1',
             'author'   => 'Ethan Beyer',
             'icon'     => 'picture-o',
-            'autoload' => false,
+            'autoload' => true,
             'href'     => 'https://github.com/ethanbeyer/Thumbies',
         );
     }
