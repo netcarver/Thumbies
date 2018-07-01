@@ -260,11 +260,16 @@ Class Thumbies extends WireData implements Module
 
         $page->setOutputFormatting(false);
         $page->$field->add($pathToFile);
-        $page->save($field);
+        $saved_ok = $page->save($field);
         $page->setOutputFormatting($of);
 
-        // start the process over again to get the thumbnail and return it.
-        $this->getThumbnail($this->file, $this->thumbnailField);
+        if ($saved_ok) {
+            // start the process over again to get the thumbnail and return it.
+            $this->getThumbnail($this->file, $this->thumbnailField);
+        } else {
+            // Do not allow recursion if file save fails.
+            $this->wire('log')->error($this->_("Could not save created image."));
+        }
     }
 
     /**
@@ -280,11 +285,16 @@ Class Thumbies extends WireData implements Module
 
         $page->setOutputFormatting(false);
         $page->$field->delete($pathToFile);
-        $page->save($field);
+        $saved_ok = $page->save($field);
         $page->setOutputFormatting($of);
 
-        // start the process over again to get the thumbnail and return it.
-        $this->getThumbnail($this->file, $this->thumbnailField);
+        if ($saved_ok) {
+            // start the process over again to get the thumbnail and return it.
+            $this->getThumbnail($this->file, $this->thumbnailField);
+        } else {
+            // Do not allow recursion if remove of image fails.
+            $this->wire('log')->error($this->_("Could not remove image from field."));
+        }
     }
 
     /**
